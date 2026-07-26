@@ -1,0 +1,401 @@
+{
+  "name": "Chatbot Telegram - Temperatura",
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -400,
+        0
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "WqVmdPUIkgiAae0Y",
+          "name": "Bot Temperatura Telegram"
+        }
+      },
+      "webhookId": "90b1272e-5af5-454a-b33e-9ebdca710bdc"
+    },
+    {
+      "id": "set-cidade",
+      "name": "Tratar Cidade",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a-chatid",
+              "name": "chatId",
+              "type": "number",
+              "value": "={{ $json.message.chat.id }}"
+            },
+            {
+              "id": "a-queue",
+              "name": "queue",
+              "type": "string",
+              "value": "={{ $json.message.text.trim().replace(/\\s+/g, ' ').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '') }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "http-weather",
+      "name": "OpenWeather",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.openweathermap.org/data/2.5/weather",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.queue }}"
+            },
+            {
+              "name": "units",
+              "value": "metric"
+            },
+            {
+              "name": "lang",
+              "value": "pt_br"
+            }
+          ]
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "GIJE0eWMO4ySpUuG",
+          "name": "OpenWeather API"
+        }
+      }
+    },
+    {
+      "id": "if-cidade",
+      "name": "Cidade Encontrada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        320,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-cidade-ok",
+              "leftValue": "={{ $json.main !== undefined && $json.name !== undefined }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "code-sucesso",
+      "name": "Mensagem Sucesso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -120
+      ],
+      "parameters": {
+        "jsCode": "const temp = Math.round($json.main.temp);\nconst city = $json.name;\nconst message = `\\uD83C\\uDF24\\uFE0F A temperatura em ${city} \\u00e9 de ${temp}\\u00b0C.`;\nconst chatId = $('Tratar Cidade').item.json.chatId;\nreturn [{ json: { message, chatId, temp, city } }];"
+      }
+    },
+    {
+      "id": "send-sucesso",
+      "name": "Enviar Sucesso",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        -120
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "WqVmdPUIkgiAae0Y",
+          "name": "Bot Temperatura Telegram"
+        }
+      },
+      "webhookId": "dbb53281-b09a-4c71-8bb9-4954d60d1017"
+    },
+    {
+      "id": "code-erro",
+      "name": "Mensagem Erro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        140
+      ],
+      "parameters": {
+        "jsCode": "const chatId = $('Tratar Cidade').item.json.chatId;\nconst message = '\\u274c Cidade n\\u00e3o encontrada. Use o formato Cidade,UF,BR (ex.: S\\u00e3o Paulo,SP,BR).';\nreturn [{ json: { message, chatId } }];"
+      }
+    },
+    {
+      "id": "send-erro",
+      "name": "Enviar Erro",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        140
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "WqVmdPUIkgiAae0Y",
+          "name": "Bot Temperatura Telegram"
+        }
+      },
+      "webhookId": "b1f9e178-e19d-4847-9335-a0422f64aef2"
+    },
+    {
+      "id": "gemini-rewrite",
+      "name": "Gemini Reescrever Mensagem",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        700,
+        -220
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-2.5-flash",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Reescreva a mensagem abaixo de forma mais natural e amigável em português do Brasil, mantendo exatamente o significado (mesma cidade e mesma temperatura). Responda SOMENTE com um JSON válido no formato {\"message\": \"...\"}, sem markdown, sem texto fora do JSON.\n\nMensagem original: {{ $json.message }}",
+              "role": "user"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "gboLBL9enjtLQfmL",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "id": "gemini-extract",
+      "name": "Extrair Mensagem Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        -300
+      ],
+      "parameters": {
+        "jsCode": "let message = null;\ntry {\n  const raw = $json.content.parts[0].text;\n  const parsed = JSON.parse(raw);\n  message = parsed.message || null;\n} catch (e) {\n  message = null;\n}\nif (!message) {\n  message = $('Mensagem Sucesso').item.json.message;\n}\nconst chatId = $('Mensagem Sucesso').item.json.chatId;\nreturn [{ json: { message, chatId } }];"
+      }
+    },
+    {
+      "id": "gemini-fallback",
+      "name": "Usar Fallback (Gemini Falhou)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        -140
+      ],
+      "parameters": {
+        "jsCode": "const message = $('Mensagem Sucesso').item.json.message;\nconst chatId = $('Mensagem Sucesso').item.json.chatId;\nreturn [{ json: { message, chatId } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Tratar Cidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tratar Cidade": {
+      "main": [
+        [
+          {
+            "node": "OpenWeather",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenWeather": {
+      "main": [
+        [
+          {
+            "node": "Cidade Encontrada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cidade Encontrada?": {
+      "main": [
+        [
+          {
+            "node": "Mensagem Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensagem Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem Sucesso": {
+      "main": [
+        [
+          {
+            "node": "Gemini Reescrever Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem Erro": {
+      "main": [
+        [
+          {
+            "node": "Enviar Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Reescrever Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Extrair Mensagem Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Usar Fallback (Gemini Falhou)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Mensagem Gemini": {
+      "main": [
+        [
+          {
+            "node": "Enviar Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Usar Fallback (Gemini Falhou)": {
+      "main": [
+        [
+          {
+            "node": "Enviar Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
