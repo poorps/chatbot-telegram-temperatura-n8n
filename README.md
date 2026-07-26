@@ -2,7 +2,7 @@
 
 Atividade avaliativa da Pós em IA e Automação (Rocketseat), módulo de n8n.
 
-O usuário manda o nome de uma cidade brasileira para o bot no Telegram (formato `Cidade,UF,BR`), o workflow consulta a API da OpenWeather e responde com a temperatura atual da cidade. Um node opcional de Google Gemini reescreve a mensagem final de forma mais natural, com fallback determinístico caso o Gemini falhe ou não tenha credencial configurada.
+O usuário manda o nome de uma cidade brasileira pro bot no Telegram (formato `Cidade,UF,BR`), o workflow consulta a API da OpenWeather e responde com a temperatura atual. Tem um node opcional de Google Gemini que reescreve a mensagem final de forma mais natural, com fallback pra mensagem determinística caso o Gemini falhe ou não tenha credencial configurada.
 
 ## Fluxo do workflow
 
@@ -23,66 +23,55 @@ Telegram Trigger
 - Instância n8n (self-hosted ou cloud)
 - Bot do Telegram criado via [@BotFather](https://t.me/BotFather)
 - API key da [OpenWeather](https://openweathermap.org/api) (free tier)
-- (Opcional) API key do [Google AI Studio](https://aistudio.google.com/) para o node Gemini
+- API key do [Google AI Studio](https://aistudio.google.com/), se quiser usar o node Gemini
 
-## Como importar o workflow
+## Importando o workflow
 
-1. No n8n, vá em **Workflows → Import from File**.
-2. Selecione o arquivo `workflow-chatbot-telegram.json` deste repositório.
-3. O workflow será importado **inativo** e com os campos de credencial vazios (nenhum token vem incluso no JSON).
+No n8n, vá em Workflows → Import from File e selecione o `workflow-chatbot-telegram.json` deste repositório. Ele importa inativo e sem nenhuma credencial preenchida (o JSON não tem token nenhum embutido).
 
 ## Configurando as credenciais
 
-Este workflow usa **Credentials do n8n** para guardar os segredos (em vez de variáveis de ambiente), o que faz o JSON ser 100% portável entre instâncias sem expor nenhuma chave.
+Aqui usei Credentials do n8n pra guardar os segredos, em vez de variável de ambiente. Assim o JSON fica portável entre instâncias sem expor chave nenhuma.
 
-### 1. Telegram API
+**Telegram API**
 
-1. Fale com o [@BotFather](https://t.me/BotFather) no Telegram, rode `/newbot`, escolha nome e username (precisa terminar em `bot`) e guarde o token retornado.
-2. No n8n: **Credentials → New → Telegram API**.
-3. Cole o token no campo **Access Token**.
-4. Nos nodes **Telegram Trigger**, **Enviar Sucesso** e **Enviar Erro**, selecione essa credencial.
+1. Fala com o [@BotFather](https://t.me/BotFather), roda `/newbot`, escolhe nome e username (tem que terminar em `bot`) e guarda o token que ele retorna.
+2. No n8n: Credentials → New → Telegram API, cola o token em Access Token.
+3. Seleciona essa credencial nos nodes Telegram Trigger, Enviar Sucesso e Enviar Erro.
 
-### 2. OpenWeather API
+**OpenWeather API**
 
-1. Crie uma conta gratuita em [openweathermap.org](https://openweathermap.org/api) e gere uma API key em "My API keys".
-2. No n8n: **Credentials → New → Query Auth**.
-3. Preencha:
-   - **Name**: `appid`
-   - **Value**: sua chave da OpenWeather
-4. No node **OpenWeather** (HTTP Request), em Authentication, selecione **Generic Credential Type → Query Auth** e escolha essa credencial. A chave é injetada automaticamente como parâmetro `appid` na chamada — nunca aparece em texto no node.
+1. Cria uma conta grátis em [openweathermap.org](https://openweathermap.org/api) e gera a API key em "My API keys".
+2. No n8n: Credentials → New → Query Auth. Name = `appid`, Value = a chave.
+3. No node OpenWeather (HTTP Request), em Authentication, escolhe Generic Credential Type → Query Auth e seleciona essa credencial. A chave é injetada automaticamente como parâmetro `appid` na chamada.
 
-> Por que Query Auth e não `$env.OPENWEATHER_API_KEY`? A instância usada para construir e testar este workflow é Community Edition e não tem o recurso *Variables* liberado (`feat:variables` bloqueado por licença). A credencial Query Auth cumpre o mesmo papel — nenhuma chave hardcoded no node — sem depender de configuração no servidor.
+Usei Query Auth em vez de `$env.OPENWEATHER_API_KEY` porque a instância que usei pra montar e testar isso é Community Edition e não tem o recurso de Variables liberado (licença bloqueia). A credencial resolve o mesmo problema (chave fora do node) sem precisar mexer em variável de ambiente do servidor.
 
-### 3. Google Gemini (opcional)
+**Google Gemini (opcional)**
 
-1. Gere uma API key em [Google AI Studio](https://aistudio.google.com/).
-2. No n8n: **Credentials → New → Google Gemini(PaLM) Api**. Cole a chave.
-3. No node **Gemini Reescrever Mensagem**, selecione essa credencial.
-4. Se você não tiver credencial Gemini configurada (ou o node falhar por qualquer motivo), o workflow **não quebra**: o node tem `onError: continueErrorOutput`, e o fluxo cai automaticamente no node **Usar Fallback (Gemini Falhou)**, que reenvia a mesma mensagem determinística gerada pelo node **Mensagem Sucesso** (sem IA). O avaliador pode rodar o workflow inteiro sem essa credencial.
+1. Gera uma API key em [Google AI Studio](https://aistudio.google.com/).
+2. No n8n: Credentials → New → Google Gemini(PaLM) Api, cola a chave.
+3. Seleciona essa credencial no node Gemini Reescrever Mensagem.
 
-## Variáveis/segredos necessários (resumo)
+Se não tiver credencial do Gemini configurada (ou o node der erro por qualquer motivo), o workflow continua funcionando: ele cai no node Usar Fallback (Gemini Falhou), que manda a mesma mensagem determinística do node Mensagem Sucesso, sem IA nenhuma. Dá pra rodar o workflow inteiro sem essa credencial.
 
-| Nome                     | Onde é usado                          | Como configurar                         |
-|--------------------------|----------------------------------------|------------------------------------------|
-| `TELEGRAM_BOT_TOKEN`     | Credencial **Telegram API**            | Gerado via @BotFather                    |
-| `OPENWEATHER_API_KEY`    | Credencial **Query Auth** (`appid`)    | Gerado em openweathermap.org             |
-| Google AI Studio API key | Credencial **Google Gemini(PaLM) Api** | Opcional — só para o node Gemini         |
+## Resumo dos segredos usados
+
+- `TELEGRAM_BOT_TOKEN` → credencial Telegram API, gerado no @BotFather
+- `OPENWEATHER_API_KEY` → credencial Query Auth (`appid`), gerado em openweathermap.org
+- API key do Google AI Studio → credencial Google Gemini(PaLM) Api, opcional
 
 ## Ativando o workflow
 
-Depois de configurar as três credenciais (ou só as duas obrigatórias), ative o workflow com o toggle **Active** no canto superior direito do editor.
+Depois de configurar as credenciais (pelo menos as duas obrigatórias), ativa o workflow no toggle Active lá no canto superior direito do editor.
 
-## Como testar
+## Testando
 
-Envie mensagens diretamente para o seu bot no Telegram, no formato `Cidade,UF,BR`:
+Manda mensagem direto pro bot no Telegram, no formato `Cidade,UF,BR`:
 
-- `São Paulo,SP,BR` → `🌤️ A temperatura em São Paulo é de 20°C.` (ou reescrita pelo Gemini, se ativo)
+- `São Paulo,SP,BR` → `🌤️ A temperatura em São Paulo é de 20°C.` (ou reescrita pelo Gemini, se tiver ativo)
 - `Belo Horizonte,MG,BR` → `🌤️ A temperatura em Belo Horizonte é de 25°C.`
 - `Curitiba,PR,BR` → `🌤️ A temperatura em Curitiba é de 16°C.`
-- Uma cidade inexistente (ex.: `Xyzabc123`) → `❌ Cidade não encontrada. Use o formato Cidade,UF,BR (ex.: São Paulo,SP,BR).`
+- Cidade inexistente (ex.: `Xyzabc123`) → `❌ Cidade não encontrada. Use o formato Cidade,UF,BR (ex.: São Paulo,SP,BR).`
 
-Os valores de temperatura variam conforme o clima real no momento do teste.
-
-## Observação sobre o node de Telegram do n8n
-
-Por padrão, o node **Telegram** do n8n acrescenta uma atribuição automática ("This message was sent automatically with n8n") às mensagens enviadas. Nos nodes **Enviar Sucesso** e **Enviar Erro**, esse comportamento foi desativado em **Additional Fields → Append n8n Attribution → off**, para manter a formatação exata exigida pela atividade.
+Os valores de temperatura mudam de acordo com o clima real na hora do teste.
